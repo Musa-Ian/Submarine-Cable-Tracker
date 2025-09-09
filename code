@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submarine Cable Tracker</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            overflow-y: auto;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #00d4ff;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #cccccc;
+        }
+        
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a3e;
+            color: #ffffff;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            background: linear-gradient(45deg, #0099cc, #006699);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #4a4a6a, #353550);
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(45deg, #353550, #2a2a3e);
+        }
+        
+        #map {
+            flex: 1;
+            position: relative;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            max-width: 300px;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+        
+        .cable-info {
+            margin-bottom: 10px;
+        }
+        
+        .cable-name {
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+        
+        .cable-details {
+            font-size: 12px;
+            color: #cccccc;
+            line-height: 1.4;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .status.active {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status.planned {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+        
+        .trace-result {
+            background: #2a2a3e;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            color: #00d4ff;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="title">🌊 Submarine Cable Tracker</div>
+            
+            <div class="section">
+                <div class="section-title">Country Analysis</div>
+                <div class="input-group">
+                    <label for="fromCountry">From Country:</label>
+                    <select id="fromCountry">
+                        <option value="">Select country...</option>
+                        <option value="US">United States</option>
+                        <option value="UK">United Kingdom</option>
+                        <option value="JP">Japan</option>
+                        <option value="AU">Australia</option>
+                        <option value="SG">Singapore</option>
+                        <option value="IN">India</option>
+                        <option value="DE">Germany</option>
+                        <option value="FR">France</option>
+                        <option value="BR">Brazil</option>
+                        <option value="CA">Canada</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="toCountry">To Country:</label>
+                    <select id="toCountry">
+                        <option value="">Select country...</option>
+                        <option value="US">United States</option>
+                        <option value="UK">United Kingdom</option>
+                        <option value="JP">Japan</option>
+                        <option value="AU">Australia</option>
+                        <option value="SG">Singapore</option>
+                        <option value="IN">India</option>
+                        <option value="DE">Germany</option>
+                        <option value="FR">France</option>
+                        <option value="BR">Brazil</option>
+                        <option value="CA">Canada</option>
+                    </select>
+                </div>
+                
+                <button class="btn" onclick="findCablesBetweenCountries()">Find Possible Cables</button>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Network Trace</div>
+                <div class="input-group">
+                    <label for="targetHost">Target Host/IP:</label>
+                    <input type="text" id="targetHost" placeholder="e.g., google.com or 8.8.8.8">
+                </div>
+                <button class="btn btn-secondary" onclick="simulateTraceroute()">Simulate Traceroute</button>
+                <div id="traceResult"></div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Cable Controls</div>
+                <button class="btn btn-secondary" onclick="showAllCables()">Show All Cables</button>
+                <button class="btn btn-secondary" onclick="showLandingPoints()">Toggle Landing Points</button>
+                <button class="btn btn-secondary" onclick="clearHighlights()">Clear Highlights</button>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Statistics</div>
+                <div style="font-size: 12px; color: #cccccc;">
+                    <div>Total Cables: <span id="totalCables">Loading...</span></div>
+                    <div>Active Cables: <span id="activeCables">Loading...</span></div>
+                    <div>Landing Points: <span id="totalLandingPoints">Loading...</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="info-panel" id="infoPanel" style="display: none;">
+            <div id="panelContent"></div>
+        </div>
+        
+        <div class="legend">
+            <div style="font-weight: bold; margin-bottom: 10px; color: #00d4ff;">Legend</div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #00d4ff;"></div>
+                <span>Submarine Cables</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff6b6b; border-radius: 50%; height: 8px; width: 8px;"></div>
+                <span>Landing Points</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ffd93d;"></div>
+                <span>Highlighted Route</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Note: You'll need to add your Mapbox access token here
+        mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN_HERE';
+        
+        let map;
+        let cablesData = null;
+        let landingPointsData = null;
+        let landingPointsVisible = false;
+        
+        // Country to region mapping for cable analysis
+        const countryRegions = {
+            'US': 'North America',
+            'CA': 'North America',
+            'UK': 'Europe',
+            'DE': 'Europe',
+            'FR': 'Europe',
+            'JP': 'Asia',
+            'SG': 'Asia',
+            'IN': 'Asia',
+            'AU': 'Oceania',
+            'BR': 'South America'
+        };
+        
+        // Initialize the map
+        function initMap() {
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/dark-v11',
+                center: [0, 20],
+                zoom: 2,
+                projection: 'naturalEarth'
+            });
+            
+            map.on('load', function() {
+                loadSubmarineCables();
+                loadLandingPoints();
+            });
+            
+            // Add click handlers for cable information
+            map.on('click', 'cables', function(e) {
+                const cableInfo = e.features[0].properties;
+                showCableInfo(cableInfo);
+            });
+            
+            map.on('mouseenter', 'cables', function() {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            
+            map.on('mouseleave', 'cables', function() {
+                map.getCanvas().style.cursor = '';
+            });
+        }
+        
+        // Load submarine cables data
+        async function loadSubmarineCables() {
+            try {
+                const response = await fetch('https://www.submarinecablemap.com/api/v3/cable/cable-geo.json');
+                const data = await response.json();
+                cablesData = data;
+                
+                map.addSource('cables', {
+                    'type': 'geojson',
+                    'data': data
+                });
+                
+                map.addLayer({
+                    'id': 'cables',
+                    'type': 'line',
+                    'source': 'cables',
+                    'layout': {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    'paint': {
+                        'line-color': '#00d4ff',
+                        'line-width': 2,
+                        'line-opacity': 0.8
+                    }
+                });
+                
+                // Update statistics
+                document.getElementById('totalCables').textContent = data.features.length;
+                document.getElementById('activeCables').textContent = data.features.length;
+                
+            } catch (error) {
+                console.error('Error loading submarine cables:', error);
+                alert('Error loading submarine cable data. Please check your internet connection.');
+            }
+        }
+        
+        // Load landing points data
+        async function loadLandingPoints() {
+            try {
+                const response = await fetch('https://www.submarinecablemap.com/api/v3/landing-point/landing-point-geo.json');
+                const data = await response.json();
+                landingPointsData = data;
+                
+                map.addSource('landing-points', {
+                    'type': 'geojson',
+                    'data': data
+                });
+                
+                map.addLayer({
+                    'id': 'landing-points',
+                    'type': 'circle',
+                    'source': 'landing-points',
+                    'layout': {
+                        'visibility': 'none'
+                    },
+                    'paint': {
+                        'circle-radius': 4,
+                        'circle-color': '#ff6b6b',
+                        'circle-opacity': 0.8,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-stroke-width': 1
+                    }
+                });
+                
+                // Update statistics
+                document.getElementById('totalLandingPoints').textContent = data.features.length;
+                
+            } catch (error) {
+                console.error('Error loading landing points:', error);
+            }
+        }
+        
+        // Show cable information
+        function showCableInfo(cableInfo) {
+            const panel = document.getElementById('infoPanel');
+            const content = document.getElementById('panelContent');
+            
+            content.innerHTML = `
+                <div class="cable-info">
+                    <div class="cable-name">${cableInfo.name || 'Unknown Cable'}</div>
+                    <div class="cable-details">
+                        ID: ${cableInfo.id || 'N/A'}<br>
+                        Color: <span style="color: ${cableInfo.color || '#00d4ff'}">${cableInfo.color || '#00d4ff'}</span><br>
+                        Feature ID: ${cableInfo.feature_id || 'N/A'}
+                    </div>
+                    <div class="status active">Active</div>
+                </div>
+            `;
+            
+            panel.style.display = 'block';
+        }
+        
+        // Find cables between countries (simplified simulation)
+        function findCablesBetweenCountries() {
+            const fromCountry = document.getElementById('fromCountry').value;
+            const toCountry = document.getElementById('toCountry').value;
+            
+            if (!fromCountry || !toCountry) {
+                alert('Please select both countries');
+                return;
+            }
+            
+            // Simulate finding cables between countries
+            const possibleCables = [
+                { name: `${fromCountry}-${toCountry} Express Cable`, probability: '85%' },
+                { name: `Trans-${countryRegions[fromCountry]}-${countryRegions[toCountry]} Cable`, probability: '60%' },
+                { name: `Global Link ${fromCountry}${toCountry}`, probability: '45%' }
+            ];
+            
+            // Highlight random cables on the map
+            highlightRandomCables(3);
+            
+            // Show results
+            showCableInfo({
+                name: `Route Analysis: ${fromCountry} → ${toCountry}`,
+                id: 'route-analysis',
+                color: '#ffd93d'
+            });
+            
+            document.getElementById('panelContent').innerHTML += `
+                <div style="margin-top: 15px;">
+                    <div style="font-weight: bold; color: #ffd93d; margin-bottom: 10px;">Possible Cables:</div>
+                    ${possibleCables.map(cable => 
+                        `<div style="margin-bottom: 8px; font-size: 12px;">
+                            <div style="color: #00d4ff;">${cable.name}</div>
+                            <div style="color: #cccccc;">Probability: ${cable.probability}</div>
+                        </div>`
+                    ).join('')}
+                </div>
+            `;
+        }
+        
+        // Simulate traceroute
+        function simulateTraceroute() {
+            const target = document.getElementById('targetHost').value;
+            if (!target) {
+                alert('Please enter a target host or IP');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('traceResult');
+            resultDiv.innerHTML = '<div class="loading">Tracing route to ' + target + '...</div>';
+            
+            setTimeout(() => {
+                const simulatedTrace = `
+traceroute to ${target}:
+ 1  192.168.1.1  1.234 ms
+ 2  10.0.0.1  15.456 ms
+ 3  isp-gateway.local  25.789 ms
+ 4  edge-router.isp.com  45.123 ms
+ 5  core-router.isp.com  85.456 ms
+ 6  submarine-cable-entry.isp.com  95.789 ms
+ 7  cable-station-a.submarine.net  145.123 ms  [SUBMARINE CABLE]
+ 8  cable-station-b.submarine.net  185.456 ms  [SUBMARINE CABLE]
+ 9  submarine-cable-exit.destination.net  195.789 ms
+10  border-router.destination.net  205.123 ms
+11  ${target}  215.456 ms
+                `;
+                
+                resultDiv.innerHTML = `<div class="trace-result">${simulatedTrace}</div>`;
+                
+                // Highlight a random cable to simulate the detected route
+                highlightRandomCables(1);
+            }, 2000);
+        }
+        
+        // Highlight random cables for demonstration
+        function highlightRandomCables(count) {
+            if (!cablesData) return;
+            
+            // Reset all cables to default color
+            map.setPaintProperty('cables', 'line-color', '#00d4ff');
+            
+            // Create a highlighted version
+            const highlightedData = {...cablesData};
+            const features = [...highlightedData.features];
+            
+            // Randomly select cables to highlight
+            for (let i = 0; i < Math.min(count, features.length); i++) {
+                const randomIndex = Math.floor(Math.random() * features.length);
+                // We'll use a filter expression instead of modifying the data
+            }
+            
+            // Update the paint property to highlight specific cables
+            map.setPaintProperty('cables', 'line-color', [
+                'case',
+                ['<', ['random'], 0.1], // Highlight ~10% of cables randomly
+                '#ffd93d',
+                '#00d4ff'
+            ]);
+        }
+        
+        // Show all cables
+        function showAllCables() {
+            if (map.getLayer('cables')) {
+                map.setLayoutProperty('cables', 'visibility', 'visible');
+                map.setPaintProperty('cables', 'line-color', '#00d4ff');
+            }
+            document.getElementById('infoPanel').style.display = 'none';
+        }
+        
+        // Toggle landing points visibility
+        function showLandingPoints() {
+            landingPointsVisible = !landingPointsVisible;
+            const visibility = landingPointsVisible ? 'visible' : 'none';
+            
+            if (map.getLayer('landing-points')) {
+                map.setLayoutProperty('landing-points', 'visibility', visibility);
+            }
+        }
+        
+        // Clear highlights
+        function clearHighlights() {
+            if (map.getLayer('cables')) {
+                map.setPaintProperty('cables', 'line-color', '#00d4ff');
+            }
+            document.getElementById('infoPanel').style.display = 'none';
+        }
+        
+        // Initialize the application
+        initMap();
+    </script>
+</body>
+</html>

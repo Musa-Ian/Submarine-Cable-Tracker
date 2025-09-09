@@ -1,0 +1,22 @@
+{
+  "name": "submarine-cable-tracker",
+  "version": "1.0.0",
+  "description": "Interactive submarine cable tracker with Mapbox visualization",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "submarine",
+    "cables",
+    "internet",
+    "infrastructure",
+    "mapbox",
+    "visualization"
+  ],
+  "author": "ianmusa",
+  "license": "MIT",
+  "homepage": "https://submarine-cable-tracker.vercel.app"
+}
